@@ -179,17 +179,22 @@ def guess_album2(trackinfo):
 		print "No tracks to identify?"
 		return
 	while track_generator!={}:
+		# Calculate probabilities to select track.
 		total=0
 		track_prob={}
 		for i in range(len(trackinfo)):
-			if (i+1) not in track_generator:
+			tracknum = i + 1
+			if tracknum not in track_generator:
 				continue
-			track_prob[i+1]=1
-			total=total+1
+			track_prob[tracknum] = 1
+			total += 1
 			for j in possible_releases:
-				if (i+1) not in possible_releases[j]:
-					track_prob[i+1]+=len(possible_releases[j])
-					total+=len(possible_releases[j])
+				if tracknum in possible_releases[j]:
+					continue
+				track_prob[tracknum]+=len(possible_releases[j])
+				total+=len(possible_releases[j])
+
+		# Select a track based on probability.
 		r=random.random()*total
 		tot=0
 		for tracknum in track_prob:
@@ -199,6 +204,8 @@ def guess_album2(trackinfo):
 			if tot>=r:
 				if tot>=r:
 					break
+
+		# Get the track selected.
 		try:
 			track = track_generator[tracknum].next()
 		except StopIteration, si:
