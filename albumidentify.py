@@ -174,25 +174,22 @@ def guess_album2(trackinfo):
 	for i in range(len(trackinfo)):
 		track_counts[i+1]=0
 		track_prob[i+1]=0
-	old_possible_releases=None
 	total=0
 	if track_generator=={}:
 		print "No tracks to identify?"
 		return
 	while track_generator!={}:
-		if 1 or old_possible_releases!=possible_releases:
-			total=0
-			track_prob={}
-			for i in range(len(trackinfo)):
-				if (i+1) not in track_generator:
-					continue
-				track_prob[i+1]=1
-				total=total+1
-				for j in possible_releases:
-					if (i+1) not in possible_releases[j]:
-						track_prob[i+1]+=len(possible_releases[j])
-						total+=len(possible_releases[j])
-			old_possible_releases=possible_releases.copy()
+		total=0
+		track_prob={}
+		for i in range(len(trackinfo)):
+			if (i+1) not in track_generator:
+				continue
+			track_prob[i+1]=1
+			total=total+1
+			for j in possible_releases:
+				if (i+1) not in possible_releases[j]:
+					track_prob[i+1]+=len(possible_releases[j])
+					total+=len(possible_releases[j])
 		r=random.random()*total
 		tot=0
 		for tracknum in track_prob:
