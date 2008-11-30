@@ -76,6 +76,7 @@ destdir=os.path.join(dest,mp3names.FixFilename(mp3names.FixArtist(albumartist.so
 print "Renaming to",destdir
 
 def mkdirs(dest):
+	dest = os.path.abspath(dest)
 	if os.path.exists(dest):
 		return
 	# Make parent directories
