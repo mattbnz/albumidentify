@@ -13,6 +13,8 @@ import random
 import shelve
 
 def output_list(l):
+	if not l:
+		return "[]"
 	l.sort()
 	ret=[]
 	start=l[0]
