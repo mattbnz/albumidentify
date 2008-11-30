@@ -145,18 +145,33 @@ def generate_track_puid_possibilities(tracks):
 			yield t
 
 
-def find_even_more_tracks(fname,tracknum,possible_releases):
-	gotone = False
-        if fname.lower().endswith(".flac"):
-                return
+def generate_track_name_possibilities(fname, tracknum, possible_releases):
+	"""Return all track ids matching the tracks.
+
+	Args:
+		fname: The file containing the track in question.
+		track: A list of tracks to match against.
+		possible_releases: Dictionary containing releases under consideration.
+	
+	Yields:
+		All releated track_ids. Looks at all track names in the releases under
+		consideration and case insensitively compares the tracks, returning any
+		matches.
+	"""
+	if fname.lower().endswith(".flac"):
+		return
 	mp3data = parsemp3.parsemp3(fname)
 	if "TIT2" not in mp3data["v2"]:
 		return
 	ftrackname = mp3data["v2"]["TIT2"]
-	for (rid,v) in possible_releases.items():
-		release = lookups.get_release_by_releaseid(rid)
+	for release_id, unused in possible_releases.items():
+		release = lookups.get_release_by_releaseid(release_id)
+		sys.stderr.write("Looking for any tracks related to %d in %s - %s\n" %
+				(tracknum, release.artist.name, release.title))
 		rtrackname = release.tracks[tracknum-1].title
 		if rtrackname.lower() == ftrackname.lower():
+			print sys.stderr.write(" * adding %s\n" %
+					release.tracks[tracknum-1].id)
 			yield release.tracks[tracknum-1]
 
 
@@ -175,12 +190,12 @@ def create_track_generator(trackinfo, possible_releases):
 	track_generator={}
 	for tracknum, details in trackinfo.iteritems():
 		fname, artist, trackname, dur, trackids, puid = details
-		track_generator[tracknum]=itertools.chain(
+		track_generator[tracknum] = itertools.chain(
 					(track for track in trackids),
 					generate_track_puid_possibilities(trackids),
-					find_even_more_tracks(fname,
-							tracknum,
-							possible_releases))
+					generate_track_name_possibilities(fname, tracknum,
+						possible_releases)
+					)
 	return track_generator
 
 
