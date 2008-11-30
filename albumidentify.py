@@ -34,7 +34,21 @@ def output_list(l):
 	else:
 		ret.append("%d" % start)
 	return "[%s]" % (",".join(ret))
-		
+
+
+def print_release(release):
+	"""Pretty print identifying details about a release.
+
+	Args:
+		release: A release object.
+
+	Returns:
+		A string suitable for output describing the release.
+	"""
+	return "[%s: %s - %s]" % (release.id[-8:], release.artist.name,
+			release.title)
+
+
 
 key = 'a7f6063296c0f1c9b75c7f511861b89b'
 
@@ -141,7 +155,7 @@ def generate_track_puid_possibilities(tracks):
 						(puid, t2.id))
 		if t.id not in done_track_ids:
 			done_track_ids.append(t.id)
-			print sys.stderr.write(" * adding %s\n" % t.id)
+			sys.stderr.write(" * adding %s\n" % t.id)
 			yield t
 
 
@@ -166,12 +180,11 @@ def generate_track_name_possibilities(fname, tracknum, possible_releases):
 	ftrackname = mp3data["v2"]["TIT2"]
 	for release_id, unused in possible_releases.items():
 		release = lookups.get_release_by_releaseid(release_id)
-		sys.stderr.write("Looking for any tracks related to %d in %s - %s\n" %
-				(tracknum, release.artist.name, release.title))
+		sys.stderr.write("Looking for any tracks related to %d in %s\n" %
+				(tracknum, print_release(release)))
 		rtrackname = release.tracks[tracknum-1].title
 		if rtrackname.lower() == ftrackname.lower():
-			print sys.stderr.write(" * adding %s\n" %
-					release.tracks[tracknum-1].id)
+			sys.stderr.write(" * adding %s\n" % release.tracks[tracknum-1].id)
 			yield release.tracks[tracknum-1]
 
 
@@ -243,9 +256,9 @@ def find_releases_for_tracks(trackinfo):
 				# as there is no further chance for it to get it.
 				for relid in possible_releases.keys():
 					if tracknum not in possible_releases[relid]:
-						release = lookups.get_release_by_releaseid(releaseid)
-						print "Removing from consideration: %s - %s" % (
-								release.artist.name, release.title)
+						release = lookups.get_release_by_releaseid(relid)
+						print "Removing from consideration: %s" % (
+								print_release(release))
 						print " does not contain this track!"
 						if tracknum-1 in release.tracks:
 							print " track %s on release: %s" % (
@@ -287,16 +300,16 @@ def find_releases_for_tracks(trackinfo):
 
 				possible_releases.setdefault(releaseid, [])
 				if tracknum not in possible_releases[releaseid]:
-					print "matched to %s - %s (tracks found: %s)" % (
-							release.artist.name, release.title, 
+					print "matched to %s (tracks found: %s)" % (
+							print_release(release),
 							output_list(possible_releases[releaseid]))
 					matches += 1
 					possible_releases[releaseid].append(tracknum)
 
 				# Check if this track has validated a lease.
 				if len(possible_releases[releaseid]) == len(trackinfo):
-					print "Valid Release Found: %s - %s" % (
-							release.artist.name, release.title)
+					print "Valid Release Found: %s" % (
+							print_release(release))
 					completed_releases.append(releaseid)
 					yield releaseid
 			if not matches:
@@ -309,8 +322,8 @@ def find_releases_for_tracks(trackinfo):
 		print "Releases under consideration:"
 		for p_relid in possible_releases:
 			p_release = lookups.get_release_by_releaseid(p_relid)
-			print " %s - %s (tracks found: %s)" % (
-					p_release.artist.name, p_release.title,
+			print " %s (tracks found: %s)" % (
+					print_release(p_release),
 					output_list(possible_releases[p_relid]))
 		print ""
 		iteration += 1
@@ -319,8 +332,7 @@ def find_releases_for_tracks(trackinfo):
 		print "Unable to find any matching releases!"
 		for relid in impossible_releases:
 			release = lookups.get_release_by_releaseid(relid)
-			print "Removed from consideration: %s - %s" % (
-					release.artist.name, release.title)
+			print "Removed from consideration: %s" % print_release(release)
 			print " track count %d did not match expected: %d" % (
 					len(release.tracks), len(trackinfo))
 
