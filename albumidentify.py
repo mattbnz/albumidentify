@@ -126,7 +126,7 @@ def generate_track_puid_possibilities(tracks):
 
 	while tracks:
 		t = tracks.pop()
-		print "Looking for any tracks related to %s" % t.id
+		sys.stderr.write("Looking for any tracks related to %s\n" % t.id)
 		track = lookups.get_track_by_id(t.id)
 		for puid in track.puids:
 			if puid in done_puids:
@@ -137,10 +137,11 @@ def generate_track_puid_possibilities(tracks):
 				if t2.id in done_track_ids:
 					continue
 				tracks.append(t2)
-				print " via %s considering track: %s" % (puid, t2.id)
+				sys.stderr.write(" via %s considering track: %s\n" %
+						(puid, t2.id))
 		if t.id not in done_track_ids:
 			done_track_ids.append(t.id)
-			print " * adding %s" % t.id
+			print sys.stderr.write(" * adding %s\n" % t.id)
 			yield t
 
 
@@ -213,14 +214,14 @@ def find_releases_for_tracks(trackinfo):
 			if tracknum in exhausted_tracks:
 				continue
 			# Get the next possibility for this track.
+			print "Track %d: " % tracknum,
 			try:
 				track = track_generator[tracknum].next()
 				num_processed += 1
 			except StopIteration, si:
 				# No more possibilities for this track.
-				print
-				print "All possibilities for track", tracknum, "exhausted"
-				print "puid:", trackinfo[tracknum][5]
+				print "all possibilities exhausted! (puid: %s)" % (
+						trackinfo[tracknum][5])
 				exhausted_tracks.append(tracknum)
 
 				# Any release not already containing this track is now invalid
@@ -246,6 +247,7 @@ def find_releases_for_tracks(trackinfo):
 					continue
 
 			# Iterate through every release this track is associated with.
+			matches = 0
 			for releaseid in (x.id for x in track.releases):
 				# Early jump if we already know this release is no good.
 				if releaseid in impossible_releases:
@@ -265,22 +267,15 @@ def find_releases_for_tracks(trackinfo):
 				# Check release matches number of tracks we are expecting.
 				if len(release.tracks) != len(trackinfo):
 					# Ignore release -- wrong number of tracks
-					print "Removing from consideration: %s - %s" % (
-							release.artist.name, release.title)
-					print " track count %d did not match expected: %d" % (
-							len(release.tracks), len(trackinfo))
 					impossible_releases.append(releaseid)
 					continue
 
-				if releaseid not in possible_releases:
-					print "Adding to consideration: %s - %s" % (
-							release.artist.name, release.title)
-					possible_releases[releaseid] = []
-				
+				possible_releases.setdefault(releaseid, [])
 				if tracknum not in possible_releases[releaseid]:
-					print "Matched track %d to %s - %s (tracks found: %s)" % (
-							tracknum, release.artist.name, release.title, 
+					print "matched to %s - %s (tracks found: %s)" % (
+							release.artist.name, release.title, 
 							output_list(possible_releases[releaseid]))
+					matches += 1
 					possible_releases[releaseid].append(tracknum)
 
 				# Check if this track has validated a lease.
@@ -289,6 +284,8 @@ def find_releases_for_tracks(trackinfo):
 							release.artist.name, release.title)
 					completed_releases.append(releaseid)
 					yield releaseid
+			if not matches:
+				print "no valid release for this track"
 			# End of release loop.
 		# End of track loop.
 		if not num_processed:
@@ -300,10 +297,17 @@ def find_releases_for_tracks(trackinfo):
 			print " %s - %s (tracks found: %s)" % (
 					p_release.artist.name, p_release.title,
 					output_list(possible_releases[p_relid]))
+		print ""
 		iteration += 1
 	# End of processing loop.
 	if not completed_releases:
 		print "Unable to find any matching releases!"
+		for relid in impossible_releases:
+			release = lookups.get_release_by_releaseid(relid)
+			print "Removed from consideration: %s - %s" % (
+					release.artist.name, release.title)
+			print " track count %d did not match expected: %d" % (
+					len(release.tracks), len(trackinfo))
 
 
 def guess_album(trackinfo):
