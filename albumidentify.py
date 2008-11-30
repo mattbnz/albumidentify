@@ -234,7 +234,6 @@ def find_releases_for_tracks(trackinfo):
 					continue
 
 			# Iterate through every release this track is associated with.
-			show_possibilities = False
 			for releaseid in (x.id for x in track.releases):
 				# Early jump if we already know this release is no good.
 				if releaseid in impossible_releases:
@@ -265,21 +264,12 @@ def find_releases_for_tracks(trackinfo):
 					print "Adding to consideration: %s - %s" % (
 							release.artist.name, release.title)
 					possible_releases[releaseid] = []
-					show_possibilities = True
 				
 				if tracknum not in possible_releases[releaseid]:
-					print "Matched track %d to %s - %s (tracks found: %s" % (
-							tracknum, release.title, 
+					print "Matched track %d to %s - %s (tracks found: %s)" % (
+							tracknum, release.artist.name, release.title, 
 							output_list(possible_releases[releaseid]))
 					possible_releases[releaseid].append(tracknum)
-
-				if show_possibilities:
-					print "Releases under consideration:"
-					for p_relid in possible_releases:
-						p_release = lookups.get_release_by_releaseid(p_relid)
-						print " %s - %s (tracks found: %s)" % (
-								p_release.artist.name, p_release.title,
-								output_list(possible_releases[i]))
 
 				# Check if this track has validated a lease.
 				if len(possible_releases[releaseid]) == len(trackinfo):
@@ -292,6 +282,12 @@ def find_releases_for_tracks(trackinfo):
 		if not num_processed:
 			# All tracks have exhaused their possibilities
 			break
+		print "Releases under consideration:"
+		for p_relid in possible_releases:
+			p_release = lookups.get_release_by_releaseid(p_relid)
+			print " %s - %s (tracks found: %s)" % (
+					p_release.artist.name, p_release.title,
+					output_list(possible_releases[p_relid]))
 		iteration += 1
 	# End of processing loop.
 	if not completed_releases:
