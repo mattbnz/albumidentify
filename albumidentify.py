@@ -142,23 +142,22 @@ def find_even_more_tracks(fname,tracknum,possible_releases):
 		if rtrackname.lower() == ftrackname.lower():
 			yield release.tracks[tracknum-1]
 
-def guess_album2(trackinfo):
-	# trackinfo is
-	#  <tracknum> => (fname,artist,trackname,dur,[mbtrackids])
-	#
-	# returns a list of possible release id's
-	#
-	# This version works by trying a breadth first search of releases to try
-	# and avoid wasting a lot of time finding releases which are going to
-	# be ignored.
-	#
-	# This function returns a list of release id's
-	possible_releases={}
-	failed_releases={}
-	impossible_releases=[]
+
+def create_track_generator(trackinfo, possible_releases):
+	"""Identify all conceivable track IDs for each track.
+
+	Args:
+		trackinfo: A dictionary of the form:
+			<tracknum> => (fname,artist,trackname,dur,[mbtrackids])
+		possible_releases: Dictionary containing releases under consideration.
+
+	Returns:
+		A dictionary, indexed by tracknum containing an iterator that will
+		yield every conceivable track object for the identified track.
+	"""
 	track_generator={}
-	completed_releases=[]
-	for (tracknum,(fname,artist,trackname,dur,trackids,puid)) in trackinfo.iteritems():
+	for tracknum, details in trackinfo.iteritems():
+		fname, artist, trackname, dur, trackids, puid = details
 		track_generator[tracknum]=itertools.chain(
 					(track
 						for track in trackids),
@@ -166,133 +165,140 @@ def guess_album2(trackinfo):
 						track for track in trackids]),
 					find_even_more_tracks(fname,
 							tracknum,
-							possible_releases)
-					)
+							possible_releases))
+	return track_generator
 
-	track_counts={}
-	track_prob={}
-	for i in range(len(trackinfo)):
-		track_counts[i+1]=0
-		track_prob[i+1]=0
-	total=0
-	if track_generator=={}:
-		print "No tracks to identify?"
-		return
-	while track_generator!={}:
-		# Calculate probabilities to select track.
-		total=0
-		track_prob={}
-		for i in range(len(trackinfo)):
-			tracknum = i + 1
-			if tracknum not in track_generator:
+
+def find_releases_for_tracks(trackinfo):
+	"""Find all potential release this album matches.
+
+	Args:
+		trackinfo: A dictionary of the form:
+			<tracknum> => (fname,artist,trackname,dur,[mbtrackids])
+
+	Yields:
+		A list of possible release ids
+		
+		This version works by trying a breadth first search of releases to try
+		and avoid wasting a lot of time finding releases which are going to
+		be ignored.
+	"""
+	possible_releases = {}
+	impossible_releases = []
+	completed_releases = []
+	exhausted_tracks = []
+	track_generator = create_track_generator(trackinfo, possible_releases)
+	tracks = track_generator.keys()
+
+	# Begin a breadth first search over all the tracks.
+	iteration = 1
+	while 1:
+		print "** Beginning iteration %d" % iteration
+		num_processed = 0
+		for tracknum in sorted(tracks):
+			if tracknum in exhausted_tracks:
 				continue
-			track_prob[tracknum] = 1
-			total += 1
-			for j in possible_releases:
-				if tracknum in possible_releases[j]:
-					continue
-				track_prob[tracknum]+=len(possible_releases[j])
-				total+=len(possible_releases[j])
+			# Get the next possibility for this track.
+			try:
+				track = track_generator[tracknum].next()
+				num_processed += 1
+			except StopIteration, si:
+				# No more possibilities for this track.
+				print
+				print "All possibilities for track", tracknum, "exhausted"
+				print "puid:", trackinfo[tracknum][5]
+				exhausted_tracks.append(tracknum)
 
-		# Select a track based on probability.
-		r=random.random()*total
-		tot=0
-		for tracknum in track_prob:
-			if tracknum not in track_generator:
-				continue
-			tot+=track_prob[tracknum]
-			if tot>=r:
-				if tot>=r:
-					break
-
-		# Get the track selected.
-		try:
-			track = track_generator[tracknum].next()
-		except StopIteration, si:
-			# If there are no more tracks for this
-			# skip it and try more.
-			del track_generator[tracknum]
-			print
-			print "All possibilities for track",tracknum,"exhausted"
-			print "puid:",trackinfo[tracknum][5]#[0].puids
-			removed_releases={}
-			for i in possible_releases.keys():
-				# Ignore any release that doesn't have this
-				# track, since we can no longer find it.
-				if tracknum not in possible_releases[i]:
-					removed_releases[i]=possible_releases[i]
-					del possible_releases[i]
-			if possible_releases=={}:
-				print "No possible releases left"
-				if removed_releases:
-					print "Possible releases:"
-					for releaseid in removed_releases:
+				# Any release not already containing this track is now invalid
+				# as there is no further chance for it to get it.
+				for relid in possible_releases.keys():
+					if tracknum not in possible_releases[relid]:
 						release = lookups.get_release_by_releaseid(releaseid)
-						print release.artist.name,"-",release.title
-						print "",release.tracks[tracknum-1].id
-						print "",output_list(removed_releases[releaseid])
-				return
-			#return
-			continue
+						print "Removing from consideration: %s - %s" % (
+								release.artist.name, release.title)
+						print " does not contain this track!"
+						if tracknum-1 in release.tracks:
+							print " track %s on release: %s" % (
+									release.tracks[tracknum-1].id)
+						print " matched tracks: %s" % (
+								output_list(possible_releases[relid]))
+						del possible_releases[relid]	
 
-		for releaseid in (x.id for x in track.releases):
-			#releaseid = track.releases[0].id
-
-			if releaseid in impossible_releases:
-				continue
-
-			release = lookups.get_release_by_releaseid(releaseid)
-
-			if len(release.tracks) != len(trackinfo):
-				# Ignore release -- wrong number of tracks
-				sys.stdout.write(release.title.encode("ascii","ignore")[:40]+": wrong number of tracks (%d not %d)\x1B[K\r" % (len(release.tracks),len(trackinfo)))
-				sys.stdout.flush()
-				impossible_releases.append(releaseid)
-				continue
-
-			found_tracknumber=lookups.track_number(release.tracks, track)
-			if found_tracknumber != tracknum:
-				#impossible_releases.append(releaseid)
-				# Ignore release -- Wrong track position
-				if releaseid in failed_releases:
-					failed_releases[releaseid]= \
-						failed_releases[releaseid]+1
+				# If there are no more possible releases then exit now.
+				if not possible_releases:
+					print "Sorry, This leaves no more possible releases!"
+					return
 				else:
-					failed_releases[releaseid]=1
+					continue
+
+			# Iterate through every release this track is associated with.
+			show_possibilities = False
+			for releaseid in (x.id for x in track.releases):
+				# Early jump if we already know this release is no good.
+				if releaseid in impossible_releases:
+					continue
+				# Early jump if this release is already good.
+				if releaseid in completed_releases:
+					continue
+				# Early jump if this track has already been matched to this
+				# release.
 				if releaseid in possible_releases:
-					#print "No longer considering",release.title,": doesn't have track at the right position (",tracknum,"expected at",found_tracknumber,")"
-					#for i in possible_releases[releaseid]:
-					#	track_counts[i]=track_counts[i]-1
-					#del possible_releases[releaseid]
-					pass
-				else:
-					sys.stdout.write(release.title.encode("ascii","ignore")[:40]+" (track at wrong position)\x1b[K\r")
-					sys.stdout.flush()
-				continue
+					if tracknum in possible_releases[releaseid]:
+						continue
+				
+				# Get release details.
+				release = lookups.get_release_by_releaseid(releaseid)
 
-			if releaseid in possible_releases:
+				# Check release matches number of tracks we are expecting.
+				if len(release.tracks) != len(trackinfo):
+					# Ignore release -- wrong number of tracks
+					print "Removing from consideration: %s - %s" % (
+							release.artist.name, release.title)
+					print " track count %d did not match expected: %d" % (
+							len(release.tracks), len(trackinfo))
+					impossible_releases.append(releaseid)
+					continue
+
+				if releaseid not in possible_releases:
+					print "Adding to consideration: %s - %s" % (
+							release.artist.name, release.title)
+					possible_releases[releaseid] = []
+					show_possibilities = True
+				
 				if tracknum not in possible_releases[releaseid]:
+					print "Matched track %d to %s - %s (tracks found: %s" % (
+							tracknum, release.title, 
+							output_list(possible_releases[releaseid]))
 					possible_releases[releaseid].append(tracknum)
-					track_counts[tracknum]=track_counts[tracknum]+1
-					print "Found track",tracknum,"on",release.title,"(tracks found: %s)\x1b[K" % (output_list(possible_releases[releaseid]))
-			else:
-				possible_releases[releaseid]=[tracknum]
-				track_counts[tracknum]=track_counts[tracknum]+1
-				print "Considering",release.title,"\x1b[K"
-				if possible_releases!={}:
-					print "Currently Considering:"
-					for i in possible_releases:
-						print "",lookups.get_release_by_releaseid(i).title,"(tracks found: %s)" % (output_list(possible_releases[i])),failed_releases.get(i,0)
-					print
 
-			if len(possible_releases[releaseid])==len(trackinfo) and releaseid not in completed_releases:
-				print release.title,"seems ok\x1b[K"
-				yield releaseid
-				completed_releases.append(releaseid)
-			
+				if show_possibilities:
+					print "Releases under consideration:"
+					for p_relid in possible_releases:
+						p_release = lookups.get_release_by_releaseid(p_relid)
+						print " %s - %s (tracks found: %s)" % (
+								p_release.artist.name, p_release.title,
+								output_list(possible_releases[i]))
+
+				# Check if this track has validated a lease.
+				if len(possible_releases[releaseid]) == len(trackinfo):
+					print "Valid Release Found: %s - %s" % (
+							release.artist.name, release.title)
+					completed_releases.append(releaseid)
+					yield releaseid
+			# End of release loop.
+		# End of track loop.
+		if not num_processed:
+			# All tracks have exhaused their possibilities
+			break
+		iteration += 1
+	# End of processing loop.
+	if not completed_releases:
+		print "Unable to find any matching releases!"
+
+
 def guess_album(trackinfo):
 	releasedata={}
-	for rid in guess_album2(trackinfo):
+	for rid in find_releases_for_tracks(trackinfo):
 		release = lookups.get_release_by_releaseid(rid)
 		albumartist=release.artist
 		if musicbrainz2.model.Release.TYPE_SOUNDTRACK in release.types:
