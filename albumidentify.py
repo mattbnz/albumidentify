@@ -114,7 +114,10 @@ def get_dir_info(dirname):
 			continue
 		tracknum=tracknum+1
 		fname=os.path.join(dirname,i)
-		trackinfo[tracknum]=get_file_info(fname)
+		try:
+			trackinfo[tracknum]=get_file_info(fname)
+		except FingerprintFailed:
+			print "Skipping invalid file", `i`
 	return trackinfo
 
 def generate_track_puid_possibilities(tracks):
