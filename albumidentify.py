@@ -177,7 +177,12 @@ def generate_track_name_possibilities(fname, tracknum, possible_releases):
 	"""
 	if fname.lower().endswith(".flac"):
 		return
-	mp3data = parsemp3.parsemp3(fname)
+	try:
+		mp3data = parsemp3.parsemp3(fname)
+	except:
+		# Parsing MP3s is a source of bugs... be robust here.
+		print "Failed to parse mp3: %s" % fname
+		return
 	if "TIT2" not in mp3data["v2"]:
 		return
 	ftrackname = mp3data["v2"]["TIT2"]
