@@ -298,7 +298,9 @@ def lyricsv2(data):
 
 def apev2(ape):
 	data={}
-	assert ape.startswith("APETAGEX"),`ape`
+	if not ape.startswith("APETAGEX"):
+		print "ERROR: INVALID APE DATA!"
+		return data
 	ape=ape[32:]
 	while ape!="":
 		apelen=ord(ape[3])*256*256*256+ord(ape[2])*256*256+ord(ape[ 1])*256+ord(ape[ 0])
